@@ -15,6 +15,7 @@ import (
 
 type DbWorker interface {
 	GetBlocksAbove(startHeight uint64, maxCount int) ([]PreparsedBlock, error)
+	GetBlockEntry(height uint64) (BlockEntry, error)
 	GetChainIntersection(chain []moneroutil.Hash) (utils.HeightInfo, error)
 	GetWalletBlocks(walletId uint32, startHeight uint64, maxBlocks int) ([]PreSerializedBlock, error)
 	GetWalletOutputs(walletId uint32) ([]OutputHeight, error)
@@ -39,10 +40,14 @@ func NewDbWorker(settings utils.DbSettings) (DbWorker, error) {
 	}, nil
 }
 
-type PreparsedBlock struct {
+type BlockEntry struct {
 	Height uint64
 	Hash   moneroutil.Hash
 	Header []byte
+}
+
+type PreparsedBlock struct {
+	BlockEntry
 	Txs    []PreparsedTx
 }
 
@@ -166,9 +171,11 @@ func (w *WalletsDb) GetBlocksAbove(startHeight uint64, maxCount int) ([]Preparse
 			}
 
 			block := PreparsedBlock{
-				Height: height,
-				Header: blockHeader,
-				Hash:   h,
+				BlockEntry: BlockEntry{
+					Height: height,
+					Header: blockHeader,
+					Hash:   h,
+				},
 				Txs:    []PreparsedTx{},
 			}
 
@@ -201,6 +208,30 @@ func (w *WalletsDb) GetBlocksAbove(startHeight uint64, maxCount int) ([]Preparse
 	}
 
 	return blocks, nil
+}
+
+func (w *WalletsDb) GetBlockEntry(height uint64) (BlockEntry, error) {
+	be := BlockEntry{}
+
+	row := w.db.QueryRow(
+		`SELECT b.height, b.hash, b.header
+			  FROM blocks b
+			  WHERE b.height = $1`, height)
+
+	var hash string
+	if err := row.Scan(&be.Height, &hash, &be.Header); err != nil {
+		logging.Log.Errorf("Failed to get block entry at height %d: %s", height, err.Error())
+		return be, err
+	}
+
+	var err error
+	be.Hash, err = moneroutil.HexToHash(hash)
+	if err != nil {
+		logging.Log.Errorf("Failed to parse block hash string from db (%s): %s", hash, err.Error())
+		return be, err
+	}
+
+	return be, nil
 }
 
 func (w *WalletsDb) GetWalletBlocks(walletId uint32, startHeight uint64, maxBlocks int) ([]PreSerializedBlock, error) {

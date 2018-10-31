@@ -6,12 +6,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/exantech/monero-fastsync/internal/app/fsd"
 	"github.com/exantech/monero-fastsync/internal/app/fsd/server"
 	"github.com/exantech/monero-fastsync/internal/pkg/logging"
 	"github.com/exantech/monero-fastsync/internal/pkg/utils"
+	"github.com/exantech/monero-fastsync/pkg/genesis"
 )
 
 var (
@@ -47,9 +49,21 @@ func main() {
 	logging.Log.Infof("Connecting to DB: host=%s, port=%d, database=%s, user=%s",
 		conf.BlockchainDb.Host, conf.BlockchainDb.Port, conf.BlockchainDb.Database, conf.BlockchainDb.User)
 
+	logging.Log.Infof("Using %s network", strings.ToUpper(conf.Network))
+
 	db, err := server.NewDbWorker(conf.BlockchainDb)
 	if err != nil {
 		logging.Log.Fatalf("Failed to connect to DB: %s", err.Error())
+	}
+
+	currentGenesis, err := db.GetBlockEntry(0)
+	if err != nil {
+		logging.Log.Fatalf("Failed to get genesis block: %s", err.Error())
+	}
+
+	if currentGenesis.Hash != genesis.GetGenesisBlockInfo(conf.Network).Hash {
+		logging.Log.Fatalf("Genesis mismatch. Current: %s, expected: %s",
+			currentGenesis.Hash, genesis.GetGenesisBlockInfo(conf.Network).Hash)
 	}
 
 	logging.Log.Infof("Starting pprof on %s", conf.Pprof)

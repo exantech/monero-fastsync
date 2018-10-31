@@ -2,8 +2,6 @@ package rpc
 
 import (
 	"bytes"
-	"errors"
-
 	"github.com/exantech/monero-fastsync/internal/pkg/utils"
 	"github.com/exantech/moneroproto"
 	"github.com/exantech/moneroutil"
@@ -24,33 +22,29 @@ type WalletChainInfoV1 struct {
 }
 
 type WalletKeysInfo struct {
-	KeyPair   [][]byte `monerobinkv:"keys"`
-	CreatedAt uint64   `monerobinkv:"created_at"`
+	ViewSecretKey  []byte `monerobinkv:"view_secret_key"`
+	SpendPublicKey []byte `monerobinkv:"spend_public_key"`
+	CreatedAt      uint64 `monerobinkv:"created_at"`
 }
 
 func (w *WalletKeysInfo) GetWalletKeys() (utils.WalletKeys, error) {
 	res := utils.WalletKeys{}
-	if len(w.KeyPair) != 2 {
-		return res, errors.New("needed exactly 2 keys")
-	}
 
 	var err error
-	r := bytes.NewReader(w.KeyPair[0])
+	r := bytes.NewReader(w.ViewSecretKey)
 	res.ViewSecretKey, err = moneroutil.ParseKey(r)
 	if err != nil {
 		return res, err
 	}
 
-	r = bytes.NewReader(w.KeyPair[1])
+	r = bytes.NewReader(w.SpendPublicKey)
 	res.SpendPublicKey, err = moneroutil.ParseKey(r)
 	return res, err
 }
 
 func (w *WalletKeysInfo) SetWalletKeys(keys utils.WalletKeys) {
-	w.KeyPair = make([][]byte, 2)
-
-	w.KeyPair[0] = keys.ViewSecretKey.Serialize()
-	w.KeyPair[1] = keys.SpendPublicKey.Serialize()
+	w.ViewSecretKey = keys.ViewSecretKey.Serialize()
+	w.SpendPublicKey = keys.SpendPublicKey.Serialize()
 }
 
 func (w *WalletChainInfoV1) GetShortChain() ([]moneroutil.Hash, error) {

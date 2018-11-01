@@ -46,19 +46,17 @@ func (b *BlocksScanner) GetBlocks(startHeight uint64, wallet utils.WalletEntry, 
 	}
 
 	// the result must include start height block
-	blocks, err := b.scanWalletBlocks(wallet, startHeight, maxBlocks)
+	sr, err := b.scanWalletBlocks(wallet, startHeight, maxBlocks)
 	if err != nil {
 		logging.Log.Errorf("Failed to process job. Error on scanning wallet's blocks: %s", err.Error())
 		return nil, err
 	}
 
-	if len(blocks) != 0 {
-		if err = b.db.SaveWalletProgress(wallet.Id, blocks[len(blocks)-1].Hash); err != nil {
-			logging.Log.Warningf("Failed save wallets progress: %s", err.Error())
-		}
+	if err = b.db.SaveWalletProgress(wallet.Id, sr.lastCheckedBlock); err != nil {
+		logging.Log.Warningf("Failed save wallets progress: %s. Probably chain split happened, reverting progress", err.Error())
 	}
 
-	return blocks, nil
+	return sr.blocks, nil
 }
 
 //include from start height
@@ -86,7 +84,12 @@ func (b *BlocksScanner) getProcessedBlocks(walletId uint32, startHeight uint64, 
 	return res, nil
 }
 
-func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight uint64, maxCount int) ([]WalletBlock, error) {
+type scanResult struct {
+	blocks           []WalletBlock
+	lastCheckedBlock moneroutil.Hash
+}
+
+func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight uint64, maxCount int) (*scanResult, error) {
 	scanFrom := utils.MinUint64(wallet.ScannedHeight, startHeight)
 
 	outs, err := b.db.GetWalletOutputs(wallet.Id)
@@ -108,6 +111,7 @@ func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight u
 
 	scanner := newTxScanner(wallet.Id, wallet.Keys, outs)
 
+	var lastBlockHash moneroutil.Hash
 	walletBlocks := make([]moneroutil.Hash, 0, maxCount)
 	foundBlocks := make([]WalletBlock, 0, maxCount)
 	for _, block := range blocks {
@@ -136,6 +140,8 @@ func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight u
 			}
 		}
 
+		lastBlockHash = block.Hash
+
 		if found {
 			walletBlocks = append(walletBlocks, block.Hash)
 		}
@@ -159,7 +165,10 @@ func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight u
 		}
 	}
 
-	return foundBlocks, nil
+	return &scanResult{
+		blocks:           foundBlocks,
+		lastCheckedBlock: lastBlockHash,
+	}, nil
 }
 
 type txScanner struct {

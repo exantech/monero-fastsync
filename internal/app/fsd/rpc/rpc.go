@@ -2,6 +2,8 @@ package rpc
 
 import (
 	"bytes"
+	"errors"
+
 	"github.com/exantech/monero-fastsync/internal/pkg/utils"
 	"github.com/exantech/moneroproto"
 	"github.com/exantech/moneroutil"
@@ -18,7 +20,7 @@ type GetMyBlocksRequest struct {
 
 type WalletChainInfoV1 struct {
 	Keys       []WalletKeysInfo `monerobinkv:"keys"`
-	ShortChain [][]byte         `monerobinkv:"short_chain"`
+	ShortChain []byte           `monerobinkv:"short_chain"`
 }
 
 type WalletKeysInfo struct {
@@ -48,9 +50,13 @@ func (w *WalletKeysInfo) SetWalletKeys(keys utils.WalletKeys) {
 }
 
 func (w *WalletChainInfoV1) GetShortChain() ([]moneroutil.Hash, error) {
-	chain := make([]moneroutil.Hash, 0, len(w.ShortChain))
-	for _, hb := range w.ShortChain {
-		r := bytes.NewReader(hb)
+	if len(w.ShortChain)%32 != 0 {
+		return nil, errors.New("unexpected short chain length")
+	}
+
+	chain := make([]moneroutil.Hash, 0, len(w.ShortChain)/32)
+	r := bytes.NewReader(w.ShortChain)
+	for i := 0; i < len(w.ShortChain)/32; i++ {
 		h, err := moneroutil.ParseHash(r)
 		if err != nil {
 			return nil, err
@@ -63,9 +69,9 @@ func (w *WalletChainInfoV1) GetShortChain() ([]moneroutil.Hash, error) {
 }
 
 func (w *WalletChainInfoV1) SetShortChain(chain []moneroutil.Hash) {
-	w.ShortChain = make([][]byte, len(chain))
-	for i, h := range chain {
-		w.ShortChain[i] = h.Serialize()
+	w.ShortChain = make([]byte, 0, len(chain)*32)
+	for _, h := range chain {
+		w.ShortChain = append(w.ShortChain, h.Serialize()...)
 	}
 }
 

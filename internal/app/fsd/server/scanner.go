@@ -31,6 +31,8 @@ func NewScanner(db DbWorker) *BlocksScanner {
 }
 
 func (b *BlocksScanner) GetBlocks(startHeight uint64, wallet utils.WalletEntry, maxBlocks int) ([]WalletBlock, error) {
+	logging.Log.Debugf("Requested blocks from height %d, processed till %d", startHeight, wallet.ScannedHeight)
+
 	if wallet.ScannedHeight > startHeight {
 		knownCount := wallet.ScannedHeight - startHeight + 1
 		//inclusive from start height

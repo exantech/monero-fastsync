@@ -95,11 +95,16 @@ func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight u
 		return nil, err
 	}
 
+	logging.Log.Debugf("Wallet has %d outputs in db", len(outs))
+
+	logging.Log.Debugf("Requesting blocks %d to process from height %d", maxCount, startHeight)
 	blocks, err := b.db.GetBlocksAbove(scanFrom, maxCount)
 	if err != nil {
 		logging.Log.Errorf("Failed to get blocks from DB from height %d: %s", startHeight, maxCount)
 		return nil, err
 	}
+
+	logging.Log.Debugf("Retrieved %d blocks", len(blocks))
 
 	scanner := newTxScanner(wallet.Id, wallet.Keys, outs)
 

@@ -83,7 +83,7 @@ func (b *BlocksHandler) HandleGetBlocks(req *rpc.WalletChainInfoV1) (*rpc.Wallet
 	res := &rpc.WalletBlocksResult{
 		StartHeight: common.Height,
 		TotalHeight: topHeight,
-		Blocks: make([]rpc.WalletBlockInfo, len(blocks)),
+		Blocks:      make([]rpc.WalletBlockInfo, len(blocks)),
 	}
 
 	for i := range blocks {

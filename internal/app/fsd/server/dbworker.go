@@ -48,7 +48,7 @@ type BlockEntry struct {
 
 type PreparsedBlock struct {
 	BlockEntry
-	Txs    []PreparsedTx
+	Txs []PreparsedTx
 }
 
 type PreparsedTx struct {
@@ -127,9 +127,8 @@ func (w *WalletsDb) GetBlocksAbove(startHeight uint64, maxCount int) ([]Preparse
 					t.output_indices, t.used_inputs
 			  FROM transactions t
 			  LEFT JOIN blocks b ON t.block_height = b.height
-			  WHERE b.height >= $1
-			  ORDER BY b.height, t.index_in_block ASC
-			  LIMIT $2`, startHeight, maxCount)
+			  WHERE b.height >= $1 AND b.height < $2
+			  ORDER BY b.height, t.index_in_block ASC`, startHeight, startHeight+uint64(maxCount))
 
 	if err != nil {
 		return nil, err
@@ -176,7 +175,7 @@ func (w *WalletsDb) GetBlocksAbove(startHeight uint64, maxCount int) ([]Preparse
 					Header: blockHeader,
 					Hash:   h,
 				},
-				Txs:    []PreparsedTx{},
+				Txs: []PreparsedTx{},
 			}
 
 			blocks = append(blocks, block)
@@ -240,9 +239,8 @@ func (w *WalletsDb) GetWalletBlocks(walletId uint32, startHeight uint64, maxBloc
 FROM blocks b
 LEFT JOIN transactions t ON t.block_height = b.height
 LEFT JOIN wallets_blocks wb ON wb.block_id = b.id
-WHERE b.height >= $1 AND (wb.wallet_id = $2 OR wb.id IS NULL)
-ORDER BY b.height, t.index_in_block ASC
-LIMIT $3`, startHeight, walletId, maxBlocks)
+WHERE b.height >= $1 AND b.height < $2 AND (wb.wallet_id = $3 OR wb.id IS NULL)
+ORDER BY b.height, t.index_in_block ASC`, startHeight, startHeight+uint64(maxBlocks), walletId)
 
 	if err != nil {
 		return nil, err

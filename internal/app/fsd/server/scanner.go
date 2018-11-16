@@ -146,14 +146,14 @@ func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight u
 			walletBlocks = append(walletBlocks, block.Hash)
 		}
 
-		if found && block.Height > startHeight {
+		if found && block.Height >= startHeight {
 			b, err := convertPreparsedToWalletBlock(block)
 			if err != nil {
 				return nil, err
 			}
 
 			foundBlocks = append(foundBlocks, b)
-		} else if block.Height > startHeight {
+		} else if block.Height >= startHeight {
 			foundBlocks = append(foundBlocks, WalletBlock{Hash: block.Hash})
 		}
 	}
@@ -267,7 +267,8 @@ func convertPreparsedToWalletBlock(block PreparsedBlock) (WalletBlock, error) {
 	res.OutputIndices = make([][]uint64, 0, len(block.Txs))
 	res.OutputIndices = append(res.OutputIndices, block.Txs[0].OutputIndices)
 
-	for _, tx := range block.Txs {
+	for i := 1; i < len(block.Txs); i++ {
+		tx := block.Txs[i]
 		bce.Txs = append(bce.Txs, tx.Blob)
 		res.OutputIndices = append(res.OutputIndices, tx.OutputIndices)
 	}
@@ -315,7 +316,8 @@ func convertPreserializedToWalletBlock(block PreSerializedBlock) (WalletBlock, e
 	res.OutputIndices = make([][]uint64, 0, len(block.Txs))
 	res.OutputIndices = append(res.OutputIndices, block.Txs[0].OutputIndices)
 
-	for _, tx := range block.Txs {
+	for i := 1; i < len(block.Txs); i++ {
+		tx := block.Txs[i]
 		bce.Txs = append(bce.Txs, tx.Blob)
 		res.OutputIndices = append(res.OutputIndices, tx.OutputIndices)
 	}

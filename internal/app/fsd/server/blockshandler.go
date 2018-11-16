@@ -89,7 +89,7 @@ func (b *BlocksHandler) HandleGetBlocks(req *rpc.WalletChainInfoV1) (*rpc.Wallet
 	for i := range blocks {
 		res.Blocks[i].Hash = blocks[i].Hash.Serialize()
 		res.Blocks[i].SetOutputIndices(blocks[i].OutputIndices)
-		//res.Blocks[i].Timestamp // TODO?
+		res.Blocks[i].Timestamp = blocks[i].Timestamp
 		if blocks[i].Bce != nil {
 			res.Blocks[i].Bce = *blocks[i].Bce
 		}

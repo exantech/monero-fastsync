@@ -1,0 +1,10 @@
+log_level: debug
+pprof: localhost:6060
+node_address: http://localhost:38081
+network: stagenet
+blockchain_db:
+  host: localhost
+  port: 5432
+  user: postgres
+  password: 123
+  database: monero

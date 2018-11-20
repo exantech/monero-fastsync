@@ -238,8 +238,8 @@ func (w *WalletsDb) GetWalletBlocks(walletId uint32, startHeight uint64, maxBloc
 		`SELECT wb.wallet_id, b.height, b.hash, b.header, t.hash, t.blob, t.output_indices
 FROM blocks b
 LEFT JOIN transactions t ON t.block_height = b.height
-LEFT JOIN wallets_blocks wb ON wb.block_id = b.id
-WHERE b.height >= $1 AND b.height < $2 AND (wb.wallet_id = $3 OR wb.id IS NULL)
+LEFT JOIN wallets_blocks wb ON wb.block_id = b.id AND wb.wallet_id = $3
+WHERE b.height >= $1 AND b.height < $2
 ORDER BY b.height, t.index_in_block ASC`, startHeight, startHeight+uint64(maxBlocks), walletId)
 
 	if err != nil {

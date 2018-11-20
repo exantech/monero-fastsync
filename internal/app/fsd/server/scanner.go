@@ -20,6 +20,7 @@ type BlocksScanner struct {
 
 type WalletBlock struct {
 	Hash          moneroutil.Hash
+	Timestamp     uint64
 	Bce           *moneroproto.BlockCompleteEntry
 	OutputIndices [][]uint64
 }
@@ -275,6 +276,7 @@ func convertPreparsedToWalletBlock(block PreparsedBlock) (WalletBlock, error) {
 
 	res.Hash = block.Hash
 	res.Bce = &bce
+	res.Timestamp = header.TimeStamp
 
 	return res, nil
 }
@@ -324,6 +326,7 @@ func convertPreserializedToWalletBlock(block PreSerializedBlock) (WalletBlock, e
 
 	res.Hash = block.Hash
 	res.Bce = &bce
+	res.Timestamp = header.TimeStamp
 
 	return res, nil
 }

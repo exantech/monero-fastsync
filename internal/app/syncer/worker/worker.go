@@ -13,10 +13,6 @@ import (
 	"github.com/exantech/monero-fastsync/pkg/genesis"
 )
 
-var (
-	ErrInterrupted = errors.New("interrupted")
-)
-
 const (
 	syncedPollInterval = 30 * time.Second
 )
@@ -104,14 +100,14 @@ func (w *Worker) syncLoop(ctx context.Context) error {
 	for {
 		if cancelled(ctx) {
 			logging.Log.Info("Interrupting sync loop")
-			return ErrInterrupted
+			return utils.ErrInterrupted
 		}
 
 		if synced {
 			select {
 			case <-ctx.Done():
 				logging.Log.Info("Interrupting sync loop")
-				return ErrInterrupted
+				return utils.ErrInterrupted
 			case <-time.After(syncedPollInterval):
 				synced = false
 			}
@@ -185,7 +181,7 @@ func (w *Worker) syncLoop(ctx context.Context) error {
 
 			if cancelled(ctx) {
 				logging.Log.Info("Interrupting sync loop")
-				return ErrInterrupted
+				return utils.ErrInterrupted
 			}
 
 			block, err := moneroutil.ParseBlockBytes(bce.Block)
@@ -219,7 +215,7 @@ func (w *Worker) syncLoop(ctx context.Context) error {
 
 		if cancelled(ctx) {
 			logging.Log.Info("Interrupting sync loop")
-			return ErrInterrupted
+			return utils.ErrInterrupted
 		}
 
 		err = w.db.SaveParsedBlocks(ctx, readyBlocks)

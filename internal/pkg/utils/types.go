@@ -1,6 +1,14 @@
 package utils
 
-import "github.com/exantech/moneroutil"
+import (
+	"errors"
+
+	"github.com/exantech/moneroutil"
+)
+
+var (
+	ErrInterrupted = errors.New("interrupted")
+)
 
 type HeightInfo struct {
 	Height uint64

@@ -21,6 +21,7 @@ type DbWorker interface {
 	GetWalletOutputs(walletId uint32) ([]OutputHeight, error)
 	SaveWalletBlocks(walletId uint32, blocks []moneroutil.Hash, outputs []OutputHeight) error
 	SaveWalletProgress(walletId uint32, hash moneroutil.Hash) error
+	GetTopScannedHeightInfo(walletId uint32) (utils.HeightInfo, error)
 	GetOrCreateKeyProgress(account utils.AccountInfo) (utils.WalletEntry, error)
 	GetTopBlockHeight() (uint64, error)
 }
@@ -383,6 +384,7 @@ func (w *WalletsDb) SaveWalletBlocks(walletId uint32, blocks []moneroutil.Hash, 
 
 	logging.Log.Debugf("Inserted %d wallet's blocks", rows)
 
+	//TODO: problem on split during scan the wallet's blocks here:
 	ostmt, err := tx.PrepareContext(context.Background(), "INSERT INTO wallets_outputs (wallet_id, output, block_height) VALUES ($1, $2, $3)")
 	if err != nil {
 		logging.Log.Errorf("Failed to prepare statement for saving wallet outputs: %s", err.Error())
@@ -432,6 +434,30 @@ WHERE wallets.id = $2`, hash.String(), walletId)
 	}
 
 	return nil
+}
+
+func (w *WalletsDb) GetTopScannedHeightInfo(walletId uint32) (utils.HeightInfo, error) {
+	res := utils.HeightInfo{}
+
+	r := w.db.QueryRow(`SELECT b.height, b.hash
+							FROM wallets
+							LEFT JOIN blocks b on wallets.last_checked_block_id = b.id
+							WHERE wallets.id = $1`, walletId)
+
+	var hash string
+	if err := r.Scan(&res.Height, &hash); err != nil {
+		logging.Log.Errorf("Failed to scan get top scanned height info: %s", hash)
+		return res, err
+	}
+
+	var err error
+	res.Hash, err = moneroutil.HexToHash(hash)
+	if err != nil {
+		logging.Log.Errorf("Failed to parse hash hex while getting top scanned height info: %s", hash)
+		return res, err
+	}
+
+	return res, nil
 }
 
 func (w *WalletsDb) GetOrCreateKeyProgress(account utils.AccountInfo) (utils.WalletEntry, error) {

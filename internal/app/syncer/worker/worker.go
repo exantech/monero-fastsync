@@ -62,8 +62,22 @@ func (w *Worker) CheckGenesis(ctx context.Context, init bool) error {
 
 	if init {
 		if dbGenesis == nil {
+			tx, err := moneroutil.ParseTransactionBytes(w.genesis.TxBlob)
+			if err != nil {
+				logging.Log.Errorf("Failed to parse genesis transaction: %s", err.Error())
+				return err
+			}
+
+			t := ParsedTransactionInfo{
+				Hash:          tx.GetHash(),
+				Blob:          w.genesis.TxBlob,
+				OutputKeys:    extractOutputKeysArray(tx.Vout),
+				OutputIndices: []uint64{0},
+				UsedInInputs:  inflateInputs(extractUsedInputs(tx.Vin)),
+			}
+
 			if err = w.db.SaveParsedBlocks(ctx, []ParsedBlockInfo{{
-				0, w.genesis.Hash, w.genesis.Header, w.genesis.Timestamp, nil,
+				0, w.genesis.Hash, w.genesis.Header, w.genesis.Timestamp, []ParsedTransactionInfo{t},
 			}}); err != nil {
 				logging.Log.Errorf("Failed to insert genesis block: %s", err.Error())
 				return err

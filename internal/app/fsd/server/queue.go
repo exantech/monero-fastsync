@@ -1,7 +1,6 @@
 package server
 
 import (
-	"errors"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -28,8 +27,7 @@ type jobsQueue struct {
 
 type job struct {
 	wallet           utils.WalletEntry
-	startHeight      uint64
-	blocks           []WalletBlock
+	blocks           *BlocksBulkList
 	lock             *sync.Mutex
 	cond             *sync.Cond
 	err              error
@@ -123,7 +121,7 @@ func (q *jobsQueue) AddJob(wallet utils.WalletEntry, startHeight uint64) *blocks
 
 	for _, j := range q.jobs {
 		if j.wallet.Keys.SpendPublicKey == wallet.Keys.SpendPublicKey && j.wallet.Keys.ViewSecretKey == wallet.Keys.ViewSecretKey {
-			j.updateJob(time.Now(), atomic.LoadUint64(&q.blockchainHeight))
+			j.updateJob(time.Now(), atomic.LoadUint64(&q.blockchainHeight), startHeight)
 			q.cond.Signal()
 			return &blocksListener{j, startHeight, q.resultBlocks}
 		}
@@ -169,7 +167,12 @@ func (q *jobsQueue) waitJob() (*job, bool) {
 // must be locked from outside
 func (q *jobsQueue) findFreeJob() *job {
 	for _, j := range q.jobs {
-		if !j.inProgress && j.currentHeightLocked() < atomic.LoadUint64(&q.blockchainHeight) && time.Now().Sub(j.lastQuery) < q.jobLifetime {
+		bcHeight := atomic.LoadUint64(&q.blockchainHeight)
+		nextBlock, _ := j.FindMissingBlocks()
+
+		synced := j.BlocksAvailable(bcHeight) != 0 && nextBlock >= bcHeight
+
+		if !j.inProgress && !synced && time.Now().Sub(j.lastQuery) < q.jobLifetime {
 			return j
 		}
 	}
@@ -179,13 +182,14 @@ func (q *jobsQueue) findFreeJob() *job {
 
 func newJob(wallet utils.WalletEntry, startHeight uint64) *job {
 	j := &job{
-		wallet:      wallet,
-		startHeight: startHeight,
-		blocks:      make([]WalletBlock, 0, 5000),
-		lock:        new(sync.Mutex),
-		inProgress:  false,
-		lastQuery:   time.Now(),
+		wallet:     wallet,
+		blocks:     NewBlocksBulkList(),
+		lock:       new(sync.Mutex),
+		inProgress: false,
+		lastQuery:  time.Now(),
 	}
+
+	j.blocks.AddBlocks(startHeight, []*WalletBlock{})
 
 	j.cond = sync.NewCond(j.lock)
 	return j
@@ -197,7 +201,7 @@ type blocksListener struct {
 	maxBlocks  int
 }
 
-func (l *blocksListener) Wait() ([]WalletBlock, error) {
+func (l *blocksListener) Wait() ([]*WalletBlock, error) {
 	return l.job.waitBlocks(l.returnFrom, l.maxBlocks)
 }
 
@@ -226,24 +230,22 @@ func (w *worker) run() {
 
 		job.wallet.ScannedHeight = top.Height
 
-		blocks, err := w.scanner.GetBlocks(job.nextHeight(), job.wallet, w.maxBlocks)
+		start, count := job.FindMissingBlocks()
+		if count > w.maxBlocks || count == 0 {
+			count = w.maxBlocks
+		}
+
+		blocks, err := w.scanner.GetBlocks(start, job.wallet, count)
 		if err != nil {
 			job.setError(err) //TODO: turn error off after use!
 			return
 		}
 
-		job.setBlocks(blocks)
+		job.setBlocks(start, blocks)
 	}
 }
 
-func (j *job) waitBlocks(from uint64, maxCount int) ([]WalletBlock, error) {
-	if from < j.startHeight {
-		logging.Log.Warningf("A job called to wait blocks from %d while it's start height %d. "+
-			"This situation is not handled", from, j.startHeight)
-
-		return nil, errors.New("not implemented")
-	}
-
+func (j *job) waitBlocks(from uint64, maxCount int) ([]*WalletBlock, error) {
 	j.lock.Lock()
 	defer j.lock.Unlock()
 
@@ -251,12 +253,12 @@ func (j *job) waitBlocks(from uint64, maxCount int) ([]WalletBlock, error) {
 	// and a wallet can get in response just 1 block, which means end of synchronization.
 	// Therefore unless we scanned blocks till blockchain height we have to send at least 2 blocks to a wallet.
 	minCount := 2
-	if j.currentHeightLocked() == j.blockchainHeight {
+	next, _ := j.blocks.FindMissingBlocks()
+	if next >= j.blockchainHeight {
 		minCount = 1
 	}
-	minSize := int(from - j.startHeight + uint64(minCount))
 
-	for len(j.blocks) < minSize && j.err == nil {
+	for j.blocks.BlocksAvailable(from) < minCount && j.err == nil {
 		j.cond.Wait()
 	}
 
@@ -264,51 +266,28 @@ func (j *job) waitBlocks(from uint64, maxCount int) ([]WalletBlock, error) {
 		return nil, j.err
 	}
 
-	count := maxCount
-	if len(j.blocks)-minSize+1 < count {
-		count = len(j.blocks) - minSize + 1
-	}
-
-	return j.blocks[minSize-minCount : minSize+count-1], nil
+	return j.blocks.GetBlocks(from, maxCount), nil
 }
 
 func (j *job) trimHeight(height uint64) {
 	j.lock.Lock()
 	defer j.lock.Unlock()
 
-	if height < j.startHeight {
-		j.blocks = make([]WalletBlock, 0, 5000)
-		j.startHeight = height
-		return
-	}
-
-	cachedHeight := j.startHeight + uint64(len(j.blocks)) - 1
-	if cachedHeight > height {
-		j.blocks = j.blocks[0 : cachedHeight-j.startHeight+1]
-	}
+	j.blocks.TrimBlocks(height)
 }
 
-func (j *job) nextHeight() uint64 {
+func (j *job) FindMissingBlocks() (uint64, int) {
 	j.lock.Lock()
 	defer j.lock.Unlock()
 
-	return j.startHeight + uint64(len(j.blocks))
+	return j.blocks.FindMissingBlocks()
 }
 
-func (j *job) currentHeight() uint64 {
+func (j *job) BlocksAvailable(start uint64) int {
 	j.lock.Lock()
 	defer j.lock.Unlock()
 
-	return j.currentHeightLocked()
-}
-
-func (j *job) currentHeightLocked() uint64 {
-	h := j.startHeight + uint64(len(j.blocks))
-	if h == 0 {
-		return h
-	}
-
-	return h - 1
+	return j.blocks.BlocksAvailable(start)
 }
 
 func (j *job) setError(err error) {
@@ -320,12 +299,12 @@ func (j *job) setError(err error) {
 	j.cond.Broadcast()
 }
 
-func (j *job) setBlocks(blocks []WalletBlock) {
+func (j *job) setBlocks(start uint64, blocks []*WalletBlock) {
 	j.lock.Lock()
 	defer j.lock.Unlock()
 
 	j.inProgress = false // XXX: the function assumed to be called just before releasing the job
-	j.blocks = append(j.blocks, blocks...)
+	j.blocks.AddBlocks(start, blocks)
 	j.cond.Broadcast()
 }
 
@@ -336,12 +315,13 @@ func (j *job) setBcHeight(bcHeight uint64) {
 	j.blockchainHeight = bcHeight
 }
 
-func (j *job) updateJob(lastQuery time.Time, bcHeight uint64) {
+func (j *job) updateJob(lastQuery time.Time, bcHeight uint64, startHeight uint64) {
 	j.lock.Lock()
 	defer j.lock.Unlock()
 
 	j.lastQuery = lastQuery
 	j.blockchainHeight = bcHeight
+	j.blocks.AddBlocks(startHeight, []*WalletBlock{})
 }
 
 type bcHeightUpdater struct {

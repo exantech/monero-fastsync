@@ -23,6 +23,7 @@ type jobsQueue struct {
 	workerBlocks     int
 	resultBlocks     int
 	jobLifetime      time.Duration
+	jj               *jobJanitor
 }
 
 type job struct {
@@ -52,6 +53,8 @@ func NewJobsQueue(scanner Scanner, db DbWorker, workerBlocks int, resultBlocks i
 
 	jq.topUpdater = newBcHeightUpdater(&jq.blockchainHeight, jq.db, 30*time.Second)
 	jq.cond = sync.NewCond(jq.lock)
+
+	jq.jj = newJobJanitor(jq, jobLifetime)
 	return jq
 }
 
@@ -85,6 +88,13 @@ func (q *jobsQueue) StartWorkers(count int) error {
 		q.topUpdater.runLoop()
 	}()
 
+	go func() {
+		q.wg.Add(1)
+		defer q.wg.Done()
+
+		q.jj.runLoop()
+	}()
+
 	return nil
 }
 
@@ -92,6 +102,10 @@ func (q *jobsQueue) Stop() {
 	logging.Log.Info("Stopping updater...")
 	q.topUpdater.stop()
 	logging.Log.Info("Updater stopped")
+
+	logging.Log.Info("Stopping job janitor...")
+	q.jj.stop()
+	logging.Log.Info("Job janitor stopped")
 
 	q.lock.Lock()
 	q.stopped = true
@@ -372,4 +386,50 @@ func (u *bcHeightUpdater) updateTopBlockInfo() error {
 
 	atomic.StoreUint64(u.topHeight, height)
 	return nil
+}
+
+type jobJanitor struct {
+	jq          *jobsQueue
+	stopCh      chan struct{}
+	jobLifetime time.Duration
+	interval    time.Duration
+}
+
+func newJobJanitor(jq *jobsQueue, jobLifetime time.Duration) *jobJanitor {
+	return &jobJanitor{
+		jq:          jq,
+		jobLifetime: jobLifetime,
+		interval:    jobLifetime,
+		stopCh:      make(chan struct{}),
+	}
+}
+
+func (jj *jobJanitor) runLoop() {
+	ticker := time.Tick(jj.interval)
+	for {
+		select {
+		case <-ticker:
+		case <-jj.stopCh:
+			logging.Log.Debug("Stop signal received, stopping job janitor loop")
+			return
+		}
+	}
+}
+
+func (jj *jobJanitor) stop() {
+	jj.stopCh <- struct{}{}
+}
+
+func (jj *jobJanitor) clean() {
+	jj.jq.lock.Lock()
+	defer jj.jq.lock.Unlock()
+
+	fresh := make([]*job, 0, len(jj.jq.jobs))
+	for _, j := range jj.jq.jobs {
+		if time.Now().Sub(j.lastQuery) < jj.jobLifetime {
+			fresh = append(fresh, j)
+		}
+	}
+
+	jj.jq.jobs = fresh
 }

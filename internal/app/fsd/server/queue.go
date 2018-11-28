@@ -389,6 +389,7 @@ func (jj *jobJanitor) runLoop() {
 	for {
 		select {
 		case <-ticker:
+			jj.clean()
 		case <-jj.stopCh:
 			logging.Log.Debug("Stop signal received, stopping job janitor loop")
 			return

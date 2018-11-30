@@ -96,11 +96,23 @@ func (w *Worker) CheckGenesis(ctx context.Context, init bool) error {
 
 func (w *Worker) syncLoop(ctx context.Context) error {
 	synced := false
+	error := false
 
 	for {
 		if cancelled(ctx) {
 			logging.Log.Info("Interrupting sync loop")
 			return utils.ErrInterrupted
+		}
+
+		if error {
+			select {
+			case <-ctx.Done():
+				logging.Log.Info("Interrupting sync loop")
+				return utils.ErrInterrupted
+			case <-time.After(syncedPollInterval):
+				logging.Log.Info("Retrying after error")
+				error = false
+			}
 		}
 
 		if synced {
@@ -119,7 +131,8 @@ func (w *Worker) syncLoop(ctx context.Context) error {
 		shortChain, err := w.db.GetShortChain()
 		if err != nil {
 			logging.Log.Errorf("Failed to get short chain: %s", err.Error())
-			return err
+			error = true
+			continue
 		}
 
 		if len(shortChain) == 0 {
@@ -134,7 +147,8 @@ func (w *Worker) syncLoop(ctx context.Context) error {
 		resp, err := w.node.GetBlocks(shortChain, 0)
 		if err != nil {
 			logging.Log.Errorf("Failed to fetch blocks from node: %s", err.Error())
-			return err
+			error = true
+			continue
 		}
 
 		logging.Log.Debugf("Fetched %d blocks", len(resp.Blocks))
@@ -145,7 +159,8 @@ func (w *Worker) syncLoop(ctx context.Context) error {
 
 			if err = w.db.TrimBlockchain(ctx, resp.StartHeight+1); err != nil {
 				logging.Log.Errorf("Failed to trim blockchain: %s", err.Error())
-				return err
+				error = true
+				continue
 			}
 
 			lastHeight = resp.StartHeight
@@ -221,7 +236,8 @@ func (w *Worker) syncLoop(ctx context.Context) error {
 		err = w.db.SaveParsedBlocks(ctx, readyBlocks)
 		if err != nil {
 			logging.Log.Errorf("Failed to save parsed blocks: %s", err.Error())
-			return err
+			error = true
+			continue
 		}
 	}
 

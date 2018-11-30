@@ -39,3 +39,12 @@ func MinUint64(a, b uint64) uint64 {
 
 	return min
 }
+
+func MinInt(a, b int) int {
+	min := a
+	if b < min {
+		min = b
+	}
+
+	return min
+}

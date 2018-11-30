@@ -263,7 +263,9 @@ func (j *job) waitBlocks(from uint64, maxCount int) ([]*WalletBlock, error) {
 	}
 
 	if j.err != nil {
-		return nil, j.err
+		err := j.err
+		j.err = nil
+		return nil, err
 	}
 
 	return j.blocks.GetBlocks(from, maxCount), nil

@@ -384,7 +384,6 @@ func (w *WalletsDb) SaveWalletBlocks(walletId uint32, blocks []moneroutil.Hash, 
 
 	logging.Log.Debugf("Inserted %d wallet's blocks", rows)
 
-	//TODO: problem on split during scan the wallet's blocks here:
 	ostmt, err := tx.PrepareContext(context.Background(), "INSERT INTO wallets_outputs (wallet_id, output, block_height) VALUES ($1, $2, $3)")
 	if err != nil {
 		logging.Log.Errorf("Failed to prepare statement for saving wallet outputs: %s", err.Error())

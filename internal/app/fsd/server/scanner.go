@@ -34,10 +34,10 @@ func NewScanner(db DbWorker) *BlocksScanner {
 func (b *BlocksScanner) GetBlocks(startHeight uint64, wallet utils.WalletEntry, maxBlocks int) ([]*WalletBlock, error) {
 	logging.Log.Debugf("Requested blocks from height %d, processed till %d", startHeight, wallet.ScannedHeight)
 
-	if wallet.ScannedHeight > startHeight {
+	if wallet.ScannedHeight >= startHeight {
 		knownCount := wallet.ScannedHeight - startHeight + 1
 		//inclusive from start height
-		blocks, err := b.getProcessedBlocks(wallet.Id, startHeight, int(utils.MinUint64(uint64(maxBlocks), knownCount)))
+		blocks, err := b.getProcessedBlocks(wallet.Id, startHeight, utils.MinInt(maxBlocks, int(knownCount)))
 		if err != nil {
 			logging.Log.Errorf("Failed to process job. Error on getting wallet's blocks: %s", err.Error())
 			return nil, err
@@ -91,7 +91,7 @@ type scanResult struct {
 }
 
 func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight uint64, maxCount int) (*scanResult, error) {
-	scanFrom := utils.MinUint64(wallet.ScannedHeight, startHeight)
+	scanFrom := utils.MinUint64(wallet.ScannedHeight+1, startHeight)
 
 	outs, err := b.db.GetWalletOutputs(wallet.Id)
 	if err != nil {
@@ -101,10 +101,10 @@ func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight u
 
 	logging.Log.Debugf("Wallet has %d outputs in db", len(outs))
 
-	logging.Log.Debugf("Requesting blocks %d to process from height %d", maxCount, startHeight)
+	logging.Log.Debugf("Requesting blocks %d to process from height %d", maxCount, scanFrom)
 	blocks, err := b.db.GetBlocksAbove(scanFrom, maxCount)
 	if err != nil {
-		logging.Log.Errorf("Failed to get blocks from DB from height %d: %s", startHeight, maxCount)
+		logging.Log.Errorf("Failed to get blocks from DB from height %d: %s", scanFrom, maxCount)
 		return nil, err
 	}
 

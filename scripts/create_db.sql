@@ -93,6 +93,27 @@ create index transactions_block_height_index
 	on transactions (block_height desc)
 ;
 
+create table wallets_outputs
+(
+	wallet_id integer not null
+		constraint wallets_outputs_wallets_id_fk
+			references wallets,
+	output integer not null,
+	block_height integer not null
+)
+;
+
+alter table wallets_outputs owner to postgres
+;
+
+create index wallets_outputs_block_height_index
+	on wallets_outputs (block_height desc)
+;
+
+create unique index wallets_outputs_wallet_id_output_uindex
+	on wallets_outputs (wallet_id, output)
+;
+
 create table wallets_blocks
 (
 	id serial not null
@@ -114,20 +135,7 @@ create unique index wallets_blocks_id_uindex
 	on wallets_blocks (id)
 ;
 
-create table wallets_outputs
-(
-	wallet_id integer not null
-		constraint wallets_outputs_wallets_id_fk
-			references wallets,
-	output integer not null,
-	block_height integer not null
-)
-;
-
-alter table wallets_outputs owner to postgres
-;
-
-create index wallets_outputs_block_height_index
-	on wallets_outputs (block_height desc)
+create unique index wallets_blocks_wallet_id_block_id_uindex
+	on wallets_blocks (wallet_id, block_id)
 ;
 

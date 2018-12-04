@@ -4,6 +4,7 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"strings"
@@ -34,7 +35,7 @@ func main() {
 		log.Fatalf("Config path is required")
 	}
 
-	var conf fsd.Config
+	conf := fsd.MakeDefaultConfig()
 	if err := utils.ReadConfig(*configPath, &conf); err != nil {
 		log.Fatalf("Couldn't read config file: %s", err.Error())
 	}
@@ -68,15 +69,23 @@ func main() {
 
 	logging.Log.Infof("Starting pprof on %s", conf.Pprof)
 	go func() {
-		log.Fatal(http.ListenAndServe(conf.Pprof, nil))
+		logging.Log.Fatal(http.ListenAndServe(conf.Pprof, nil))
 	}()
 
-	handler := server.NewServer(server.NewBlocksHandler(db, server.NewScanner(db)))
+	queue := server.NewJobsQueue(server.NewScanner(db), db, conf.ProcessBlocks, conf.ResultBlocks, conf.JobLifetime)
+
+	err = queue.StartWorkers(conf.Workers)
+	if err != nil {
+		logging.Log.Fatalf("Failed to start async queue: %s", err.Error())
+	}
+
+	handler := server.NewServer(server.NewBlocksHandler(db, queue))
 
 	logging.Log.Infof("Starting server on %s", conf.Server)
 	handler.StartAsync(conf.Server)
 
 	<-sig
 
+	queue.Stop()
 	logging.Log.Infof("Server stopped by signal")
 }

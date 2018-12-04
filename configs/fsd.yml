@@ -1,7 +1,17 @@
 log_level: debug
 pprof: localhost:6061
+# supported networks: mainnet and stagenet
 network: stagenet
 server: 0.0.0.0:18081
+# number of workers that process the jobs
+workers: 10
+# how many blocks one job will process at one time
+process_blocks: 2000
+# max blocks to return to a wallet at one time
+result_blocks: 1000
+# after this idle time a job will be considered as inactive
+job_lifetime: 1m
+
 blockchain_db:
   host: localhost
   port: 5432

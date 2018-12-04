@@ -93,7 +93,7 @@ loop:
 			logging.Log.Info("Sending stop signal to the worker")
 			cancel()
 		case err := <-done:
-			if err == worker.ErrInterrupted {
+			if err == utils.ErrInterrupted {
 				logging.Log.Info("Sync loop interrupted")
 			} else if err != nil {
 				logging.Log.Fatalf("Sync worker finished with error: %s", err.Error())

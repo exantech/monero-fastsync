@@ -11,7 +11,7 @@ import (
 )
 
 type Scanner interface {
-	GetBlocks(startHeight uint64, wallet utils.WalletEntry, maxBlocks int) ([]WalletBlock, error)
+	GetBlocks(startHeight uint64, wallet utils.WalletEntry, maxBlocks int) ([]*WalletBlock, error)
 }
 
 type BlocksScanner struct {
@@ -31,13 +31,13 @@ func NewScanner(db DbWorker) *BlocksScanner {
 	}
 }
 
-func (b *BlocksScanner) GetBlocks(startHeight uint64, wallet utils.WalletEntry, maxBlocks int) ([]WalletBlock, error) {
+func (b *BlocksScanner) GetBlocks(startHeight uint64, wallet utils.WalletEntry, maxBlocks int) ([]*WalletBlock, error) {
 	logging.Log.Debugf("Requested blocks from height %d, processed till %d", startHeight, wallet.ScannedHeight)
 
-	if wallet.ScannedHeight > startHeight {
+	if wallet.ScannedHeight >= startHeight {
 		knownCount := wallet.ScannedHeight - startHeight + 1
 		//inclusive from start height
-		blocks, err := b.getProcessedBlocks(wallet.Id, startHeight, int(utils.MinUint64(uint64(maxBlocks), knownCount)))
+		blocks, err := b.getProcessedBlocks(wallet.Id, startHeight, utils.MinInt(maxBlocks, int(knownCount)))
 		if err != nil {
 			logging.Log.Errorf("Failed to process job. Error on getting wallet's blocks: %s", err.Error())
 			return nil, err
@@ -61,17 +61,17 @@ func (b *BlocksScanner) GetBlocks(startHeight uint64, wallet utils.WalletEntry, 
 }
 
 //include from start height
-func (b *BlocksScanner) getProcessedBlocks(walletId uint32, startHeight uint64, maxBlocks int) ([]WalletBlock, error) {
+func (b *BlocksScanner) getProcessedBlocks(walletId uint32, startHeight uint64, maxBlocks int) ([]*WalletBlock, error) {
 	var blocks []PreSerializedBlock
 	blocks, err := b.db.GetWalletBlocks(walletId, startHeight, maxBlocks) //inclusive from start height
 	if err != nil {
 		return nil, err
 	}
 
-	res := make([]WalletBlock, 0, len(blocks))
+	res := make([]*WalletBlock, 0, len(blocks))
 	for _, b := range blocks {
 		if len(b.Txs) == 0 {
-			res = append(res, WalletBlock{Hash: b.Hash})
+			res = append(res, &WalletBlock{Hash: b.Hash})
 		} else {
 			wb, err := convertPreserializedToWalletBlock(b)
 			if err != nil {
@@ -86,12 +86,12 @@ func (b *BlocksScanner) getProcessedBlocks(walletId uint32, startHeight uint64, 
 }
 
 type scanResult struct {
-	blocks           []WalletBlock
+	blocks           []*WalletBlock
 	lastCheckedBlock moneroutil.Hash
 }
 
 func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight uint64, maxCount int) (*scanResult, error) {
-	scanFrom := utils.MinUint64(wallet.ScannedHeight, startHeight)
+	scanFrom := utils.MinUint64(wallet.ScannedHeight+1, startHeight)
 
 	outs, err := b.db.GetWalletOutputs(wallet.Id)
 	if err != nil {
@@ -101,10 +101,10 @@ func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight u
 
 	logging.Log.Debugf("Wallet has %d outputs in db", len(outs))
 
-	logging.Log.Debugf("Requesting blocks %d to process from height %d", maxCount, startHeight)
+	logging.Log.Debugf("Requesting blocks %d to process from height %d", maxCount, scanFrom)
 	blocks, err := b.db.GetBlocksAbove(scanFrom, maxCount)
 	if err != nil {
-		logging.Log.Errorf("Failed to get blocks from DB from height %d: %s", startHeight, maxCount)
+		logging.Log.Errorf("Failed to get blocks from DB from height %d: %s", scanFrom, maxCount)
 		return nil, err
 	}
 
@@ -114,7 +114,7 @@ func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight u
 
 	var lastBlockHash moneroutil.Hash
 	walletBlocks := make([]moneroutil.Hash, 0, maxCount)
-	foundBlocks := make([]WalletBlock, 0, maxCount)
+	foundBlocks := make([]*WalletBlock, 0, maxCount)
 	for _, block := range blocks {
 		found := false
 		for _, tx := range block.Txs {
@@ -155,7 +155,7 @@ func (b *BlocksScanner) scanWalletBlocks(wallet utils.WalletEntry, startHeight u
 
 			foundBlocks = append(foundBlocks, b)
 		} else if block.Height >= startHeight {
-			foundBlocks = append(foundBlocks, WalletBlock{Hash: block.Hash})
+			foundBlocks = append(foundBlocks, &WalletBlock{Hash: block.Hash})
 		}
 	}
 
@@ -235,8 +235,8 @@ func calcOutputPubKey(derivation moneroutil.Key, index int, spendPublic monerout
 	return P
 }
 
-func convertPreparsedToWalletBlock(block PreparsedBlock) (WalletBlock, error) {
-	res := WalletBlock{}
+func convertPreparsedToWalletBlock(block PreparsedBlock) (*WalletBlock, error) {
+	res := &WalletBlock{}
 
 	r := bytes.NewReader(block.Header)
 	header, err := moneroutil.ParseBlockHeader(r)
@@ -281,8 +281,8 @@ func convertPreparsedToWalletBlock(block PreparsedBlock) (WalletBlock, error) {
 	return res, nil
 }
 
-func convertPreserializedToWalletBlock(block PreSerializedBlock) (WalletBlock, error) {
-	res := WalletBlock{}
+func convertPreserializedToWalletBlock(block PreSerializedBlock) (*WalletBlock, error) {
+	res := &WalletBlock{}
 
 	if len(block.Txs) == 0 {
 		return res, nil

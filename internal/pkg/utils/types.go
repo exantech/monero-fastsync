@@ -1,6 +1,14 @@
 package utils
 
-import "github.com/exantech/moneroutil"
+import (
+	"errors"
+
+	"github.com/exantech/moneroutil"
+)
+
+var (
+	ErrInterrupted = errors.New("interrupted")
+)
 
 type HeightInfo struct {
 	Height uint64
@@ -24,6 +32,15 @@ type WalletEntry struct {
 }
 
 func MinUint64(a, b uint64) uint64 {
+	min := a
+	if b < min {
+		min = b
+	}
+
+	return min
+}
+
+func MinInt(a, b int) int {
 	min := a
 	if b < min {
 		min = b

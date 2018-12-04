@@ -16,12 +16,13 @@ var (
 type BlocksHandler struct {
 	dbWorker DbWorker
 	scanner  Scanner
+	queue    *jobsQueue
 }
 
-func NewBlocksHandler(db DbWorker, scanner Scanner) *BlocksHandler {
+func NewBlocksHandler(db DbWorker, queue *jobsQueue) *BlocksHandler {
 	return &BlocksHandler{
 		dbWorker: db,
-		scanner:  scanner,
+		queue:    queue,
 	}
 }
 
@@ -65,10 +66,11 @@ func (b *BlocksHandler) HandleGetBlocks(req *rpc.WalletChainInfoV1) (*rpc.Wallet
 		return nil, ErrInternalError
 	}
 
-	// may return empty blocks in case if scanned height much less than common height
-	blocks, err := b.scanner.GetBlocks(common.Height, progress, 1000)
+	listener := b.queue.AddJob(progress, common.Height)
+
+	blocks, err := listener.Wait()
 	if err != nil {
-		logging.Log.Errorf("Error while processing wallet keys: %s", err.Error())
+		logging.Log.Errorf("Failed to get wallet's blocks: %s", err.Error())
 		return nil, ErrInternalError
 	}
 

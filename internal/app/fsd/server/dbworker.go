@@ -96,10 +96,13 @@ func toStringList(hashes []moneroutil.Hash) string {
 }
 
 func (w *WalletsDb) GetChainIntersection(chain []moneroutil.Hash) (utils.HeightInfo, error) {
+	hashStrings := toStringList(chain)
+
+	// sometimes first hash in monero shortchain isn't topmost one
+	// in this case we have to preserve order in select result
 	row := w.db.QueryRow(fmt.Sprintf(`SELECT height, hash FROM blocks
-		WHERE hash IN (%s)
-		ORDER BY height DESC
-		LIMIT 1`, toStringList(chain)))
+	WHERE hash IN (%s)
+	ORDER BY array_position(array[%s], hash::text) ASC`, hashStrings, hashStrings))
 
 	hi := utils.HeightInfo{}
 	var hs string

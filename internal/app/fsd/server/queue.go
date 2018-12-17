@@ -222,7 +222,7 @@ func (w *worker) run() {
 		top, err := w.db.GetTopScannedHeightInfo(job.wallet.Id)
 		if err != nil {
 			job.setError(err) //TODO: turn error off after use!
-			return
+			continue
 		}
 
 		// in case if chain split occurred we trim top detached blocks
@@ -238,7 +238,7 @@ func (w *worker) run() {
 		blocks, err := w.scanner.GetBlocks(start, job.wallet, count)
 		if err != nil {
 			job.setError(err) //TODO: turn error off after use!
-			return
+			continue
 		}
 
 		job.setBlocks(start, blocks)

@@ -119,9 +119,10 @@ func (q *jobsQueue) AddJob(wallet utils.WalletEntry, startHeight uint64) *blocks
 	q.lock.Lock()
 	defer q.lock.Unlock()
 
+	topHeight := atomic.LoadUint64(&q.blockchainHeight)
 	for _, j := range q.jobs {
 		if j.wallet.Keys.SpendPublicKey == wallet.Keys.SpendPublicKey && j.wallet.Keys.ViewSecretKey == wallet.Keys.ViewSecretKey {
-			j.updateJob(time.Now(), atomic.LoadUint64(&q.blockchainHeight), startHeight)
+			j.updateJob(time.Now(), topHeight, startHeight)
 			q.cond.Signal()
 			return &blocksListener{j, startHeight, q.resultBlocks}
 		}
@@ -140,6 +141,30 @@ func (q *jobsQueue) addNewJob(wallet utils.WalletEntry, startHeight uint64) *job
 	q.jobs = append(q.jobs, newJob)
 
 	return newJob
+}
+
+func (q *jobsQueue) jobDone(job *job) {
+	q.lock.Lock()
+	defer q.lock.Unlock()
+
+	i := 0
+	for _, j := range q.jobs {
+		if j == job {
+			break
+		}
+
+		i++
+	}
+
+	// move job to the end of the queue
+	q.jobs = append(q.jobs[0:i], q.jobs[i+1:]...)
+	q.jobs = append(q.jobs, job)
+
+	job.lock.Lock()
+	job.inProgress = false
+	job.lock.Unlock()
+
+	q.cond.Signal()
 }
 
 func (q *jobsQueue) waitJob() (*job, bool) {
@@ -219,30 +244,35 @@ func (w *worker) run() {
 			return
 		}
 
-		top, err := w.db.GetTopScannedHeightInfo(job.wallet.Id)
-		if err != nil {
-			job.setError(err) //TODO: turn error off after use!
-			continue
-		}
-
-		// in case if chain split occurred we trim top detached blocks
-		job.trimHeight(top.Height)
-
-		job.wallet.ScannedHeight = top.Height
-
-		start, count := job.FindMissingBlocks()
-		if count > w.maxBlocks || count == 0 {
-			count = w.maxBlocks
-		}
-
-		blocks, err := w.scanner.GetBlocks(start, job.wallet, count)
-		if err != nil {
-			job.setError(err) //TODO: turn error off after use!
-			continue
-		}
-
-		job.setBlocks(start, blocks)
+		w.processJob(job)
+		w.queue.jobDone(job)
 	}
+}
+
+func (w *worker) processJob(job *job) {
+	top, err := w.db.GetTopScannedHeightInfo(job.wallet.Id)
+	if err != nil {
+		job.setError(err) //TODO: turn error off after use!
+		return
+	}
+
+	// in case if chain split occurred we trim top detached blocks
+	job.trimHeight(top.Height)
+
+	job.wallet.ScannedHeight = top.Height
+
+	start, count := job.FindMissingBlocks()
+	if count > w.maxBlocks || count == 0 {
+		count = w.maxBlocks
+	}
+
+	blocks, err := w.scanner.GetBlocks(start, job.wallet, count)
+	if err != nil {
+		job.setError(err) //TODO: turn error off after use!
+		return
+	}
+
+	job.setBlocks(start, blocks)
 }
 
 func (j *job) waitBlocks(from uint64, maxCount int) ([]*WalletBlock, error) {
@@ -296,7 +326,6 @@ func (j *job) setError(err error) {
 	j.lock.Lock()
 	defer j.lock.Unlock()
 
-	j.inProgress = false // XXX: the function assumed to be called just before releasing the job
 	j.err = err
 	j.cond.Broadcast()
 }
@@ -305,7 +334,6 @@ func (j *job) setBlocks(start uint64, blocks []*WalletBlock) {
 	j.lock.Lock()
 	defer j.lock.Unlock()
 
-	j.inProgress = false // XXX: the function assumed to be called just before releasing the job
 	j.blocks.AddBlocks(start, blocks)
 	j.cond.Broadcast()
 }

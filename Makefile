@@ -3,7 +3,7 @@ UID=$(shell id -u)
 PWD=$(shell pwd)
 VERSION=$(shell git describe --always --tags)
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
-ifneq (${BRANCH}, "master")
+ifneq (${BRANCH}, master)
 	VERSION:=${VERSION}-${BRANCH}
 endif
 

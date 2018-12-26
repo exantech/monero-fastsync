@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -20,15 +21,22 @@ import (
 
 var (
 	moduleName = "syncer"
+	version    = "develop"
 	configPath = flag.String("config", "syncer.yml", "path to configuration file")
 	initDb     = flag.Bool("init", false, "initially populate DB with genesis block info")
 	help       = flag.Bool("h", false, "show this help message")
+	ver        = flag.Bool("v", false, "show version")
 )
 
 func main() {
 	flag.Parse()
 	if *help {
 		flag.Usage()
+		return
+	}
+
+	if *ver {
+		fmt.Println(version)
 		return
 	}
 

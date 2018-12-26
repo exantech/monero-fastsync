@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	_ "net/http/pprof"
@@ -19,14 +20,21 @@ import (
 
 var (
 	moduleName = "fast-sync"
+	version    = "develop"
 	configPath = flag.String("config", "fsd.yml", "path to configuration file")
 	help       = flag.Bool("h", false, "show this help message")
+	ver        = flag.Bool("v", false, "show version")
 )
 
 func main() {
 	flag.Parse()
 	if *help {
 		flag.Usage()
+		return
+	}
+
+	if *ver {
+		fmt.Println(version)
 		return
 	}
 

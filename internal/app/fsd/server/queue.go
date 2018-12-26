@@ -282,7 +282,7 @@ func (j *job) waitBlocks(from uint64, maxCount int) ([]*WalletBlock, error) {
 	// There is the situation when wallet's blocks are not fully scanned till blockchain height
 	// and a wallet can get in response just 1 block, which means end of synchronization.
 	// Therefore unless we scanned blocks till blockchain height we have to send at least 2 blocks to a wallet.
-	minCount := 2
+	minCount := 4
 	next, _ := j.blocks.FindMissingBlocks()
 	if next >= j.blockchainHeight {
 		minCount = 1

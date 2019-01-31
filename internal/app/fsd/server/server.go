@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"net/http"
 
+	"github.com/exantech/moneroproto"
+
 	"github.com/exantech/monero-fastsync/internal/app/fsd/rpc"
 	"github.com/exantech/monero-fastsync/internal/pkg/logging"
-	"github.com/exantech/moneroproto"
+	"github.com/exantech/monero-fastsync/internal/pkg/metrics"
 )
 
 const (
@@ -47,13 +49,14 @@ func (s *Server) StartAsync(address string) {
 
 func WrapHandler(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(resp http.ResponseWriter, req *http.Request) {
-		// TODO: metrics here
 		logging.Log.Debugf("Incoming request %s", req.URL.Path)
 		handler(resp, req)
 	}
 }
 
 func (s *Server) HandleGetBlocks(resp http.ResponseWriter, req *http.Request) {
+	go metrics.Graphite().SimpleSend("fsd.clients.blocks_requests", "1")
+
 	ureq := rpc.GetMyBlocksRequest{}
 	err := moneroproto.Read(req.Body, &ureq)
 	if err != nil {

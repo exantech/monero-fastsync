@@ -9,15 +9,16 @@ import (
 )
 
 type Config struct {
-	LogLevel      string           `yaml:"log_level"`
-	Server        string           `yaml:"server"`
-	Pprof         string           `yaml:"pprof"`
-	BlockchainDb  utils.DbSettings `yaml:"blockchain_db"`
-	Network       string           `yaml:"network"`
-	Workers       int              `yaml:"workers"`
-	ProcessBlocks int              `yaml:"process_blocks"`
-	ResultBlocks  int              `yaml:"result_blocks"`
-	JobLifetime   time.Duration    `yaml:"job_lifetime"`
+	LogLevel      string                  `yaml:"log_level"`
+	Server        string                  `yaml:"server"`
+	Pprof         string                  `yaml:"pprof"`
+	BlockchainDb  utils.DbSettings        `yaml:"blockchain_db"`
+	Network       string                  `yaml:"network"`
+	Workers       int                     `yaml:"workers"`
+	ProcessBlocks int                     `yaml:"process_blocks"`
+	ResultBlocks  int                     `yaml:"result_blocks"`
+	JobLifetime   time.Duration           `yaml:"job_lifetime"`
+	Metrics       *utils.GraphiteSettings `yaml:"metrics"`
 }
 
 func MakeDefaultConfig() Config {
@@ -35,6 +36,12 @@ func (c *Config) Validate() error {
 	case "mainnet", "stagenet": // testnet is currently not supported
 	default:
 		return errors.New(fmt.Sprintf("unknown network: %s", c.Network))
+	}
+
+	if c.Metrics != nil {
+		if err := c.Metrics.Validate(); err != nil {
+			return err
+		}
 	}
 
 	return nil

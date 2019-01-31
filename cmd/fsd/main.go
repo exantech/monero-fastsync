@@ -14,6 +14,7 @@ import (
 	"github.com/exantech/monero-fastsync/internal/app/fsd"
 	"github.com/exantech/monero-fastsync/internal/app/fsd/server"
 	"github.com/exantech/monero-fastsync/internal/pkg/logging"
+	"github.com/exantech/monero-fastsync/internal/pkg/metrics"
 	"github.com/exantech/monero-fastsync/internal/pkg/utils"
 	"github.com/exantech/monero-fastsync/pkg/genesis"
 )
@@ -54,6 +55,10 @@ func main() {
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+
+	if err := metrics.Init(conf.Metrics); err != nil {
+		logging.Log.Fatalf("Failed to init graphite: %s", err.Error())
+	}
 
 	logging.Log.Infof("Connecting to DB: host=%s, port=%d, database=%s, user=%s",
 		conf.BlockchainDb.Host, conf.BlockchainDb.Port, conf.BlockchainDb.Database, conf.BlockchainDb.User)

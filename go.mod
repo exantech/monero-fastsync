@@ -5,6 +5,7 @@ require (
 	github.com/exantech/moneroproto v0.0.0-20181029174205-5817f3d1f2a8
 	github.com/exantech/moneroutil v0.0.0-20181016132018-c9292e639cb7
 	github.com/lib/pq v1.0.0
+	github.com/marpaia/graphite-golang v0.0.0-20171231172105-134b9af18cf3
 	github.com/op/go-logging v0.0.0-20160315200505-970db520ece7
 	gopkg.in/yaml.v2 v2.2.2
 )

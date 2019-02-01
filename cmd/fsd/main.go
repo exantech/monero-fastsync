@@ -20,11 +20,12 @@ import (
 )
 
 var (
-	moduleName = "fast-sync"
-	version    = "develop"
-	configPath = flag.String("config", "fsd.yml", "path to configuration file")
-	help       = flag.Bool("h", false, "show this help message")
-	ver        = flag.Bool("v", false, "show version")
+	moduleName      = "fast-sync"
+	version         = "develop"
+	configPath      = flag.String("config", "fsd.yml", "path to configuration file")
+	metricsConfPath = flag.String("metrics", "", "path to metrics config")
+	help            = flag.Bool("h", false, "show this help message")
+	ver             = flag.Bool("v", false, "show version")
 )
 
 func main() {
@@ -45,7 +46,7 @@ func main() {
 	}
 
 	conf := fsd.MakeDefaultConfig()
-	if err := utils.ReadConfig(*configPath, &conf); err != nil {
+	if err := utils.ReadYamlConfig(*configPath, &conf); err != nil {
 		log.Fatalf("Couldn't read config file: %s", err.Error())
 	}
 
@@ -56,8 +57,15 @@ func main() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
-	if err := metrics.Init(conf.Metrics); err != nil {
-		logging.Log.Fatalf("Failed to init graphite: %s", err.Error())
+	if len(*metricsConfPath) != 0 {
+		metricsConf := &fsd.MetricsConfig{}
+		if err := utils.ReadJsonConfig(*metricsConfPath, metricsConf); err != nil {
+			logging.Log.Fatalf("Failed to read metrics config %s: %s", *metricsConfPath, err.Error())
+		}
+
+		if err := metrics.Init(metricsConf.Graphite); err != nil {
+			logging.Log.Fatalf("Failed to init graphite: %s", err.Error())
+		}
 	}
 
 	logging.Log.Infof("Connecting to DB: host=%s, port=%d, database=%s, user=%s",

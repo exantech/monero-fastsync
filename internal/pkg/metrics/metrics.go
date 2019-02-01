@@ -15,7 +15,7 @@ func Init(c *utils.GraphiteSettings) error {
 	}
 
 	var err error
-	g, err = graphite.GraphiteFactory(c.Protocol, c.Host, c.Port, c.Prefix)
+	g, err = graphite.GraphiteFactory("tcp", c.Host, c.Port, "")
 
 	return err
 }

@@ -46,7 +46,7 @@ func main() {
 	}
 
 	var conf syncer.Config
-	if err := utils.ReadConfig(*configPath, &conf); err != nil {
+	if err := utils.ReadYamlConfig(*configPath, &conf); err != nil {
 		log.Fatalf("Couldn't read config file: %s", err.Error())
 	}
 

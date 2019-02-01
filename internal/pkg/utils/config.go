@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -21,13 +22,11 @@ type DbSettings struct {
 }
 
 type GraphiteSettings struct {
-	Protocol string `yaml:"protocol"`
-	Host     string `yaml:"host"`
-	Port     int    `yaml:"port"`
-	Prefix   string `yaml:"prefix"`
+	Host string `json:"host"`
+	Port int    `json:"port"`
 }
 
-func ReadConfig(filename string, conf ConfigValidator) error {
+func ReadYamlConfig(filename string, conf ConfigValidator) error {
 	data, err := ioutil.ReadFile(filename)
 	if err != nil {
 		return err
@@ -41,12 +40,24 @@ func ReadConfig(filename string, conf ConfigValidator) error {
 	return conf.Validate()
 }
 
+func ReadJsonConfig(filename string, conf ConfigValidator) error {
+	data, err := ioutil.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(data, conf.(interface{}))
+	if err != nil {
+		return err
+	}
+
+	return conf.Validate()
+}
+
 func (g *GraphiteSettings) Validate() error {
 	if g != nil {
-		switch g.Protocol {
-		case "nop", "tcp", "udp":
-		default:
-			return errors.New(fmt.Sprintf("unknown metrics protocol: %s", g.Protocol))
+		if g.Host == "" {
+			return errors.New("empty host string")
 		}
 
 		if g.Port < 1 || g.Port > 65535 {

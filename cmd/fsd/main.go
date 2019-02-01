@@ -66,6 +66,9 @@ func main() {
 		if err := metrics.Init(metricsConf.Graphite); err != nil {
 			logging.Log.Fatalf("Failed to init graphite: %s", err.Error())
 		}
+
+		logging.Log.Infof("Started with metrics config: host=%s, port=%d",
+			metricsConf.Graphite.Host, metricsConf.Graphite.Port)
 	}
 
 	logging.Log.Infof("Connecting to DB: host=%s, port=%d, database=%s, user=%s",

@@ -55,7 +55,7 @@ func WrapHandler(handler func(http.ResponseWriter, *http.Request)) func(http.Res
 }
 
 func (s *Server) HandleGetBlocks(resp http.ResponseWriter, req *http.Request) {
-	go metrics.Graphite().SimpleSend("fsd.clients.blocks_requests", "1")
+	go metrics.SimpleSend("fsd.clients.blocks_requests", "1")
 
 	ureq := rpc.GetMyBlocksRequest{}
 	err := moneroproto.Read(req.Body, &ureq)

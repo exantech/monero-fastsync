@@ -3,6 +3,7 @@ package metrics
 import (
 	"github.com/marpaia/graphite-golang"
 
+	"github.com/exantech/monero-fastsync/internal/pkg/logging"
 	"github.com/exantech/monero-fastsync/internal/pkg/utils"
 )
 
@@ -10,7 +11,6 @@ var g *graphite.Graphite
 
 func Init(c *utils.GraphiteSettings) error {
 	if c == nil {
-		g = graphite.NewGraphiteNop("", 0)
 		return nil
 	}
 
@@ -20,6 +20,12 @@ func Init(c *utils.GraphiteSettings) error {
 	return err
 }
 
-func Graphite() *graphite.Graphite {
-	return g
+func SimpleSend(stat string, value string) {
+	if g == nil {
+		return
+	}
+
+	if err := g.SimpleSend(stat, value); err != nil {
+		logging.Log.Debugf("Failed to send metrics: %s", err.Error())
+	}
 }

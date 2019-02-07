@@ -63,7 +63,7 @@ func main() {
 			logging.Log.Fatalf("Failed to read metrics config %s: %s", *metricsConfPath, err.Error())
 		}
 
-		if err := metrics.Init(metricsConf.Graphite); err != nil {
+		if err := metrics.Init(metricsConf.Graphite, metricsConf.Hostname); err != nil {
 			logging.Log.Fatalf("Failed to init graphite: %s", err.Error())
 		}
 

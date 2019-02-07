@@ -22,6 +22,7 @@ type Config struct {
 
 type MetricsConfig struct {
 	Graphite *utils.GraphiteSettings `json:"graphite"`
+	Hostname string                  `json:"metrics-hostname"`
 }
 
 func MakeDefaultConfig() Config {

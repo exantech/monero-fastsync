@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"net/http"
+	"time"
 
 	"github.com/exantech/moneroproto"
 
@@ -49,14 +50,17 @@ func (s *Server) StartAsync(address string) {
 
 func WrapHandler(handler func(http.ResponseWriter, *http.Request)) func(http.ResponseWriter, *http.Request) {
 	return func(resp http.ResponseWriter, req *http.Request) {
+		metrics.Rps.Mark(1)
+		start := time.Now()
+
 		logging.Log.Debugf("Incoming request %s", req.URL.Path)
 		handler(resp, req)
+
+		metrics.RequestDuration.UpdateSince(start)
 	}
 }
 
 func (s *Server) HandleGetBlocks(resp http.ResponseWriter, req *http.Request) {
-	go metrics.SimpleSend("fsd.clients.blocks_requests", "1")
-
 	ureq := rpc.GetMyBlocksRequest{}
 	err := moneroproto.Read(req.Body, &ureq)
 	if err != nil {

@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"strconv"
 
 	"github.com/exantech/moneroproto"
 	"github.com/exantech/moneroutil"
@@ -45,7 +44,7 @@ func (b *BlocksScanner) GetBlocks(startHeight uint64, wallet utils.WalletEntry, 
 			return nil, err
 		}
 
-		go metrics.SimpleSend("fsd.blocks.cached", strconv.Itoa(len(blocks)))
+		metrics.BlocksCached.Mark(int64(len(blocks)))
 		return blocks, nil
 	}
 
@@ -60,7 +59,7 @@ func (b *BlocksScanner) GetBlocks(startHeight uint64, wallet utils.WalletEntry, 
 		logging.Log.Warningf("Failed save wallets progress: %s. Probably chain split happened, reverting progress", err.Error())
 	}
 
-	go metrics.SimpleSend("fsd.blocks.scanned", strconv.Itoa(len(sr.blocks)))
+	metrics.BlocksScanned.Mark(int64(len(sr.blocks)))
 	return sr.blocks, nil
 }
 

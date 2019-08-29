@@ -448,14 +448,14 @@ func (w *WalletsDb) GetTopScannedHeightInfo(walletId uint32) (utils.HeightInfo, 
 
 	var hash string
 	if err := r.Scan(&res.Height, &hash); err != nil {
-		logging.Log.Errorf("Failed to scan get top scanned height info: %s", hash)
+		logging.Log.Errorf("Failed to scan get top scanned height info: %s", err.Error())
 		return res, err
 	}
 
 	var err error
 	res.Hash, err = moneroutil.HexToHash(hash)
 	if err != nil {
-		logging.Log.Errorf("Failed to parse hash hex while getting top scanned height info: %s", hash)
+		logging.Log.Errorf("Failed to parse hash hex while getting top scanned height info: %s [%s]", err.Error(), hash)
 		return res, err
 	}
 

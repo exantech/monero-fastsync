@@ -156,8 +156,12 @@ func (q *jobsQueue) jobDone(job *job) {
 		i++
 	}
 
-	// move job to the end of the queue
-	q.jobs = append(q.jobs[0:i], q.jobs[i+1:]...)
+	// job janitor can delete the job from the queue
+	if i < len(q.jobs) {
+		// move job to the end of the queue
+		q.jobs = append(q.jobs[0:i], q.jobs[i+1:]...)
+	}
+
 	q.jobs = append(q.jobs, job)
 
 	job.lock.Lock()

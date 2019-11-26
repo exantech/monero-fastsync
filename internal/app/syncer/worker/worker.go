@@ -152,6 +152,11 @@ func (w *Worker) syncLoop(ctx context.Context) error {
 		}
 
 		logging.Log.Debugf("Fetched %d blocks", len(resp.Blocks))
+		if len(resp.Blocks) == 0 {
+			logging.Log.Debug("Blockchain is synchronized")
+			synced = true
+			continue
+		}
 
 		if resp.StartHeight != lastHeight {
 			logging.Log.Infof("Blockchain reorganize needed. Last known height: %d, daemon start height: %d",
